@@ -15,8 +15,10 @@
 pthread_mutex_t mutex_state = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char *argv[]) {
+  char kb_msg[MSG_SIZE + 10];
+  char msg[MSG_SIZE + 1];
   int i = 0, port;
-  pthread_t threads[3];
+  pthread_t threads[2];
   Server mServer;
   mServer.num_clients = 0;
   struct sockaddr_in server_address;
@@ -54,10 +56,26 @@ int main(int argc, char *argv[]) {
 
   pthread_create(&threads[0], NULL, newClient, (void*) &mServer);
   pthread_create(&threads[1], NULL, listenClient, (void*) &mServer);
-  pthread_create(&threads[2], NULL, keyPressed, (void*) &mServer);
 
   /*  Now wait for clients and requests */
-  while (1) {}
+  while (1) {
+    fgets(kb_msg, MSG_SIZE + 1, stdin);
+    if (strcmp(kb_msg, "quit\n")==0) {
+      printf("Stopping server... \n" );
+      sprintf(msg, "XServer is shutting down.\n");
+      for (i = 0; i < mServer.num_clients ; i++) {
+        write(mServer.fd_array[i], msg, strlen(msg));
+        close(mServer.fd_array[i]);
+      }
+    close(mServer.server_sockfd);
+    exit(0);
+    }
+    else {
+      sprintf(msg, "M>>server: %s\n", kb_msg);
+      for (i = 0; i < mServer.num_clients ; i++)
+        write(mServer.fd_array[i], msg, strlen(msg));
+    }
+  }
 }
 
 void exitClient(int fd, fd_set *readfds, char fd_array[], int *num_clients){
@@ -98,31 +116,6 @@ void * newClient(void *server){
   }
 }
 
-void * keyPressed(void *server){
-  char kb_msg[MSG_SIZE + 10];
-  char msg[MSG_SIZE + 1];
-  Server* mServer = (Server*) server;
-  int i;
-  while(1){
-    fgets(kb_msg, MSG_SIZE + 1, stdin);
-    if (strcmp(kb_msg, "quit\n")==0) {
-      printf("Stopping server... \n" );
-      sprintf(msg, "XServer is shutting down.\n");
-      for (i = 0; i < mServer->num_clients ; i++) {
-        write(mServer->fd_array[i], msg, strlen(msg));
-        close(mServer->fd_array[i]);
-      }
-    close(mServer->server_sockfd);
-    exit(0);
-    }
-    else {
-      sprintf(msg, "M>>server: %s\n", kb_msg);
-      for (i = 0; i < mServer->num_clients ; i++)
-        write(mServer->fd_array[i], msg, strlen(msg));
-    }
-  }
-}
-
 void * listenClient(void* server){
   char kb_msg[MSG_SIZE + 10];
   char msg[MSG_SIZE + 1];
@@ -130,9 +123,7 @@ void * listenClient(void* server){
   Server* mServer = (Server*) server;
   while(1){
     mServer->testfds = mServer->readfds;
-    select(FD_SETSIZE, &(mServer->testfds), NULL, NULL, NULL); //wait for FDs
-    /* A partir de fd 4 ya que el 0 corresponde a la consola, el 1 al socket, el 2 al 0
-     * y el tercero da un error, no sé a qué corresponde */
+    select(FD_SETSIZE, &(mServer->testfds), NULL, NULL, NULL);
     pthread_mutex_lock(&mutex_state);
     for (fd = 4; fd < FD_SETSIZE; fd++) {
       if(FD_ISSET(fd, &(mServer->testfds))){

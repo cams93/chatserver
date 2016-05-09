@@ -8,5 +8,4 @@ typedef struct Server{
 
 void exitClient(int fd, fd_set *readfds, char fd_array[], int *num_clients);
 void * newClient(void *server);
-void * keyPressed(void *server);
 void * listenClient(void *server);
